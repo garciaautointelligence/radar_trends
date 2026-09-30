@@ -49,18 +49,26 @@ export default function App() {
       {loading && <p className="meta">Carregando...</p>}
       {error && <p className="warn">Erro: {error}</p>}
 
-      <ol className="list">
+            <ol className="list">
         {rows.map((r) => {
           const news = r.news?.[0]
           const hasLink = news?.url?.startsWith('http')
+
           return (
             <li key={r.rank} className="card">
               <span className="rank">{r.rank}</span>
+
               <div className="info">
                 <span className="term">{r.term}</span>
+
                 {news?.title &&
                   (hasLink ? (
-                    <a href={news.url} target="_blank" rel="noreferrer" className="news">
+                    <a
+                      href={news.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="news"
+                    >
                       {news.source ? `${news.source}: ` : ''}
                       {news.title}
                     </a>
@@ -68,11 +76,16 @@ export default function App() {
                     <span className="news">{news.title}</span>
                   ))}
               </div>
+
               <span className="vol">{fmtVol(r.traffic_min)}</span>
             </li>
           )
         })}
       </ol>
+
+      <p className="meta" style={{ marginTop: 24 }}>
+        Posição = ordem de exibição no Google Trends. Volume = estimativa mínima de buscas.
+      </p>
     </main>
   )
 }
