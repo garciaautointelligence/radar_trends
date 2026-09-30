@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+collector/logs/
+feed_sample.xml
+node_modules/
+dist/
