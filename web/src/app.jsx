@@ -47,6 +47,14 @@ const fmtDuration = (minutes) => {
   return m ? `${h} h ${m} min` : `${h} h`
 }
 
+const fmtAgo = (iso) => {
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 48) return `há ${h} h`
+  return `há ${Math.floor(h / 24)} d`
+}
+
 const termLink = (termKey) => `#/t/${encodeURIComponent(termKey)}`
 
 function useHashTerm() {
@@ -348,6 +356,175 @@ function PeriodSummary({ period, refreshKey }) {
   )
 }
 
+/* ---------- Rankings: por volume e por horário de início ---------- */
+
+const RANK_PERIODS = {
+  agora: { label: 'Agora' },
+  hoje: { label: 'Hoje' },
+  '24h': { label: '24 horas' },
+  '7d': { label: '7 dias' },
+}
+
+function Rankings({ updatedAt, refreshKey }) {
+  const [period, setPeriod] = useState('24h')
+  const [by, setBy] = useState('volume') // 'volume' | 'inicio'
+  const [oldestFirst, setOldestFirst] = useState(false)
+  const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    // "Agora" = somente a coleta mais recente
+    const since = period === 'agora' ? updatedAt : sinceFor(period)
+    if (!since) return
+    let cancelled = false
+    setData(null)
+    setError(null)
+    supabase
+      .rpc('term_rankings', { p_region: REGION, p_since: since })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) setError(error.message)
+        else setData(data)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [period, updatedAt, refreshKey])
+
+  const sorted = useMemo(() => {
+    if (!data) return []
+    const arr = [...data]
+    if (by === 'volume') {
+      // Volume vem em faixas (200+, 500+...), então há empates: desempata pela melhor posição
+      arr.sort(
+        (a, b) =>
+          (b.traffic_min ?? -1) - (a.traffic_min ?? -1) ||
+          a.best_rank - b.best_rank ||
+          b.appearances - a.appearances
+      )
+    } else {
+      // Sem horário de início, o termo vai para o fim da lista
+      arr.sort((a, b) => {
+        const sa = a.started_at ? Date.parse(a.started_at) : null
+        const sb = b.started_at ? Date.parse(b.started_at) : null
+        if (sa == null && sb == null) return 0
+        if (sa == null) return 1
+        if (sb == null) return -1
+        return oldestFirst ? sa - sb : sb - sa
+      })
+    }
+    return arr.slice(0, 30)
+  }, [data, by, oldestFirst])
+
+  const maxVol = useMemo(
+    () => Math.max(1, ...sorted.map((r) => r.traffic_min ?? 0)),
+    [sorted]
+  )
+  // Barra em escala logarítmica (as faixas de volume variam muito)
+  const barPct = (v) => {
+    if (!v) return 0
+    if (maxVol <= 1) return 100
+    return Math.max(8, Math.round((Math.log10(v) / Math.log10(maxVol)) * 100))
+  }
+
+  return (
+    <section>
+      <p className="meta" style={{ marginTop: 16 }}>
+        Ordenar por
+      </p>
+      <div className="periods" style={{ marginTop: 6 }}>
+        <button className={by === 'volume' ? 'active' : ''} onClick={() => setBy('volume')}>
+          Maior volume
+        </button>
+        <button className={by === 'inicio' ? 'active' : ''} onClick={() => setBy('inicio')}>
+          Horário de início
+        </button>
+      </div>
+      {by === 'inicio' && (
+        <div className="periods" style={{ marginTop: 0 }}>
+          <button className={!oldestFirst ? 'active' : ''} onClick={() => setOldestFirst(false)}>
+            Mais recentes primeiro
+          </button>
+          <button className={oldestFirst ? 'active' : ''} onClick={() => setOldestFirst(true)}>
+            Mais antigos primeiro
+          </button>
+        </div>
+      )}
+
+      <p className="meta">Período</p>
+      <div className="periods" style={{ marginTop: 6 }}>
+        {Object.entries(RANK_PERIODS).map(([key, p]) => (
+          <button
+            key={key}
+            className={key === period ? 'active' : ''}
+            onClick={() => setPeriod(key)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {error && <p className="warn">Erro: {error}</p>}
+      {!data && !error && <p className="meta">Carregando...</p>}
+      {data && data.length === 0 && <p className="meta">Sem coletas neste período.</p>}
+
+      {data && data.length > 0 && (
+        <>
+          <p className="meta">
+            Top {sorted.length} de {data.length} termos. Em Hoje, 24 horas e 7 dias, o volume é o
+            maior já visto no período; "Agora" considera só a última coleta.
+          </p>
+          <ol className="list">
+            {sorted.map((r, i) => (
+              <li
+                key={r.term_key}
+                className="card clickable"
+                onClick={() => {
+                  window.location.hash = termLink(r.term_key)
+                }}
+              >
+                <span className="rank">{i + 1}</span>
+                <div className="info">
+                  <a href={termLink(r.term_key)} className="term">
+                    {r.term}
+                  </a>
+                  {by === 'volume' && (
+                    <div className="bar">
+                      <div className="bar-fill" style={{ width: `${barPct(r.traffic_min)}%` }} />
+                    </div>
+                  )}
+                  <span className="news">
+                    Início:{' '}
+                    {r.started_at
+                      ? `${fmtDate(r.started_at)} (${fmtAgo(r.started_at)})`
+                      : 'não informado'}{' '}
+                    · Volume: {r.traffic_min != null ? fmtVol(r.traffic_min) : '—'} · Melhor posição:
+                    #{r.best_rank}
+                  </span>
+                </div>
+                <span className="vol">
+                  {by === 'volume'
+                    ? r.traffic_min != null
+                      ? fmtVol(r.traffic_min)
+                      : '—'
+                    : r.started_at
+                      ? fmtAgo(r.started_at)
+                      : '—'}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="meta" style={{ marginTop: 24 }}>
+            Volume = estimativa mínima do Google (faixas como 200+, 500+, 1 mil+), por isso há muitos
+            empates; neles vale a melhor posição na lista. Início = horário em que a tendência
+            começou, conforme o feed.
+          </p>
+        </>
+      )}
+    </section>
+  )
+}
+
 /* ---------- App ---------- */
 
 export default function App() {
@@ -459,19 +636,23 @@ export default function App() {
         <TermDetail
           termKey={termKey}
           current={rows.find((r) => r.term_key === termKey)}
-          initialPeriod={view === 'agora' ? '24h' : view}
+          initialPeriod={PERIODS[view] ? view : '24h'}
           refreshKey={refreshKey}
         />
       ) : (
         <>
           <div className="tabs">
-            {['agora', ...Object.keys(PERIODS)].map((key) => (
+            {[
+              ['agora', 'Agora'],
+              ['rankings', 'Rankings'],
+              ...Object.entries(PERIODS).map(([key, p]) => [key, p.label]),
+            ].map(([key, label]) => (
               <button
                 key={key}
                 className={key === view ? 'active' : ''}
                 onClick={() => setView(key)}
               >
-                {key === 'agora' ? 'Agora' : PERIODS[key].label}
+                {label}
               </button>
             ))}
           </div>
@@ -543,6 +724,8 @@ export default function App() {
                 Posição = ordem de exibição no Google Trends. Volume = estimativa mínima de buscas.
               </p>
             </>
+          ) : view === 'rankings' ? (
+            <Rankings updatedAt={updatedAt} refreshKey={refreshKey} />
           ) : (
             <PeriodSummary period={view} refreshKey={refreshKey} />
           )}
