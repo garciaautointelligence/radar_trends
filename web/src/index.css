@@ -162,10 +162,16 @@ a.news:hover { text-decoration: underline; }
 }
 .search-submit { justify-self: start; align-self: end; min-height: 40px; }
 .search-result { margin-top: 18px; }
+.search-chart {
+  width: 100%; min-height: 460px; margin-top: 12px; overflow: hidden;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+}
+.search-chart iframe { display: block; width: 100%; min-height: 460px; border: 0; }
 .search-open { display: inline-block; margin-top: 12px; text-decoration: none; }
 @keyframes urgent-pulse { 50% { box-shadow: 0 0 0 3px rgba(220, 70, 70, .16); } }
 @media (prefers-reduced-motion: reduce) { .topic-card.urgent { animation: none; } }
 @media (max-width: 480px) {
   .search-submit { width: 100%; }
   .search-open { width: 100%; text-align: center; }
+  .search-chart, .search-chart iframe { min-height: 420px; }
 }

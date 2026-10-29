@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from './supabase'
 
@@ -56,6 +56,43 @@ const fmtAgo = (iso) => {
 }
 
 const termLink = (termKey) => `#/t/${encodeURIComponent(termKey)}`
+
+let googleTrendsEmbedLoader
+
+function loadGoogleTrendsEmbed() {
+  if (window.trends?.embed?.renderExploreWidgetTo) {
+    return Promise.resolve(window.trends.embed)
+  }
+  if (!googleTrendsEmbedLoader) {
+    googleTrendsEmbedLoader = new Promise((resolve, reject) => {
+      const existingScript = document.querySelector('[data-google-trends-embed-loader]')
+      const script = existingScript ?? document.createElement('script')
+      const onLoad = () => {
+        const embed = window.trends?.embed
+        if (!embed?.renderExploreWidgetTo) {
+          googleTrendsEmbedLoader = null
+          reject(new Error('O Google Trends não disponibilizou o renderizador do gráfico.'))
+          return
+        }
+        resolve(embed)
+      }
+      const onError = () => {
+        googleTrendsEmbedLoader = null
+        reject(new Error('Não foi possível carregar o gráfico do Google Trends.'))
+      }
+
+      script.addEventListener('load', onLoad, { once: true })
+      script.addEventListener('error', onError, { once: true })
+      if (!existingScript) {
+        script.src = 'https://ssl.gstatic.com/trends_nrtr/4630_RC01/embed_loader.js'
+        script.async = true
+        script.dataset.googleTrendsEmbedLoader = 'true'
+        document.head.appendChild(script)
+      }
+    })
+  }
+  return googleTrendsEmbedLoader
+}
 
 function useHashTerm() {
   const read = () => {
@@ -229,6 +266,60 @@ function SearchComparison() {
   const [period, setPeriod] = useState('today 1-m')
   const [comparison, setComparison] = useState(null)
   const [error, setError] = useState(null)
+  const [widgetError, setWidgetError] = useState(null)
+  const [widgetLoading, setWidgetLoading] = useState(false)
+  const chartRef = useRef(null)
+
+  useEffect(() => {
+    if (!comparison || !chartRef.current) return undefined
+
+    let cancelled = false
+    const target = chartRef.current
+    target.replaceChildren()
+    setWidgetLoading(true)
+    setWidgetError(null)
+
+    const comparisonItem = comparison.terms.map((keyword) => ({
+      keyword,
+      geo: 'BR',
+      time: comparison.period,
+    }))
+    const exploreQuery = [
+      'hl=pt-BR',
+      'tz=180',
+      `date=${encodeURIComponent(comparison.period)}`,
+      'geo=BR',
+      `q=${comparison.terms.map(encodeURIComponent).join(',')}`,
+    ].join('&')
+
+    loadGoogleTrendsEmbed()
+      .then((embed) => {
+        if (cancelled) return
+        const iframe = embed.renderExploreWidgetTo(
+          target,
+          'TIMESERIES',
+          { comparisonItem, category: 0, property: '' },
+          {
+            exploreQuery,
+            guestPath: 'https://trends.google.com:443/trends/embed/',
+            width: '100%',
+          }
+        )
+        if (!iframe) throw new Error('O Google Trends não criou o gráfico.')
+        iframe.title = `Interesse ao longo do tempo: ${comparison.terms.join(', ')}`
+        setWidgetLoading(false)
+      })
+      .catch((widgetLoadError) => {
+        if (cancelled) return
+        setWidgetError(widgetLoadError.message)
+        setWidgetLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+      target.replaceChildren()
+    }
+  }, [comparison])
 
   const submit = (event) => {
     event.preventDefault()
@@ -300,8 +391,11 @@ function SearchComparison() {
           <p className="meta">
             Índice relativo: 100 representa o pico de popularidade no período e na região escolhidos.
           </p>
+          {widgetLoading && <p className="meta" role="status">Carregando gráfico do Google Trends…</p>}
+          {widgetError && <p className="warn" role="alert">{widgetError}</p>}
+          <div className="search-chart" ref={chartRef} />
           <a className="collect search-open" href={googleTrendsUrl} target="_blank" rel="noreferrer">
-            Ver gráfico diário no Google Trends
+            Abrir esta comparação no Google Trends
           </a>
         </div>
       )}

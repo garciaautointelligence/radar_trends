@@ -138,7 +138,7 @@ Deploy novo não aparece? Veja em **Deployments** se o último está com erro. Q
 - **Volume** é uma estimativa mínima ("200+" = pelo menos 200).
 - **Emergindo / selos:** compara a última coleta com a anterior. "novo" = não estava na anterior; "▲ N" = subiu N posições.
 - **Abas Hoje / 24 horas / 7 dias:** termos mais presentes na lista no período, com melhor posição e maior volume. "Hoje" usa a meia-noite do fuso do dispositivo.
-- **Aba Pesquisa:** compara até três termos no Brasil pelo Google Trends, com gráfico diário dos últimos 30 ou 90 dias aberto no Google. O índice de 0 a 100 representa interesse relativo, não o total absoluto de buscas.
+- **Aba Pesquisa:** compara até três termos no Brasil pelo gráfico incorporado do Google Trends, com dados diários dos últimos 30 ou 90 dias. O índice de 0 a 100 representa interesse relativo, não o total absoluto de buscas.
 - **Detalhe do termo:** gráfico de posição (1 no topo). Trechos sem linha = o termo saiu da lista naquela coleta.
 - **Coletar agora:** dispara uma coleta pela função da Vercel. Há intervalo mínimo de 10 minutos entre quaisquer duas coletas (agendadas ou manuais). Coletas manuais ficam com `source = 'google_trends_rss_manual'`.
 - **Aviso de dados antigos:** aparece após 2 horas sem coleta.
