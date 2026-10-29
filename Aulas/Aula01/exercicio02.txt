@@ -1,0 +1,14 @@
+Qual é a diferença entre hipótese e inferência?
+
+hipotese
+é um padrao que ainda precisa ser testado 
+
+inferencia
+é a conclusão tirada depois de ver os dados 
+
+
+Por que “30% dos títulos citam política” não prova que política é o assunto mais importante?
+porque estamos falando somente de 1/3 do todo, e dentro da politica pode estar falando de outros assuntos.
+
+
+Qual é a unidade de análise do Projeto 1?

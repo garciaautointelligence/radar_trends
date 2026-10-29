@@ -1,0 +1,41 @@
+fato, hipótese, opinião  inferência
+
+“Em março, o município X registrou 120 mm de chuva, segundo o instituto de meteorologia.”
+fato
+
+
+“A cobertura de segurança aumenta quando há eleição.”
+inferência
+
+
+“O telejornal da noite é melhor que o da manhã.”
+opinião
+
+
+“O número de títulos sobre política subiu, então a emissora mudou sua estratégia.”
+inferência
+
+
+“Dos 200 títulos coletados, 60 citam política.”
+fato
+
+
+“Os apresentadores evitam falar de economia.”
+hipótese
+
+
+“Se 30% dos títulos citam política, política é o assunto mais importante do dia.”
+hipótese
+
+
+“Segundo o censo, a cidade tem 500 mil habitantes.”
+fato
+
+Será que a TV só fala de política?
+
+qual será a tv que mais fala de politica de segunda a sexta das 6h as 00h?
+
+titulo e dia, 
+qual titulo tem mais visualização ?
+quais dias o titulo teve mais visualização?
+quais dias a politica foi mais discutida? essa nao me confirma nada 
