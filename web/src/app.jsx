@@ -259,24 +259,6 @@ function SearchComparison() {
     return `https://trends.google.com/trends/explore?${params.toString()}`
   }, [comparison])
 
-  const embedUrl = useMemo(() => {
-    if (!comparison) return null
-    const params = new URLSearchParams({
-      hl: 'pt-BR',
-      tz: '180',
-      date: comparison.period,
-      geo: 'BR',
-      q: comparison.terms.join(','),
-      cmpt: 'q',
-      content: '1',
-      cid: 'TIMESERIES_GRAPH_0',
-      export: '5',
-      w: '720',
-      h: '500',
-    })
-    return `https://trends.google.com/trends/embed/explore/TIMESERIES?${params.toString()}`
-  }, [comparison])
-
   return (
     <section className="search-comparison">
       <h2 className="section-title">Comparar pesquisas</h2>
@@ -313,23 +295,15 @@ function SearchComparison() {
       </form>
 
       {error && <p className="warn" role="alert">{error}</p>}
-      {embedUrl && googleTrendsUrl && (
-        <>
-          <div className="search-chart">
-            <iframe
-              title={`Comparação no Google Trends: ${comparison.terms.join(', ')}`}
-              src={embedUrl}
-              loading="lazy"
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          </div>
+      {googleTrendsUrl && (
+        <div className="search-result">
           <p className="meta">
             Índice relativo: 100 representa o pico de popularidade no período e na região escolhidos.
-            <a className="search-link" href={googleTrendsUrl} target="_blank" rel="noreferrer">
-              Abrir comparação no Google Trends
-            </a>
           </p>
-        </>
+          <a className="collect search-open" href={googleTrendsUrl} target="_blank" rel="noreferrer">
+            Ver gráfico diário no Google Trends
+          </a>
+        </div>
       )}
     </section>
   )
