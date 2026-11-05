@@ -17,7 +17,7 @@ Supabase (PostgreSQL)  ◄──────────────────
 Site React + Vite (Vercel)
 ```
 
-**Versão:** v1.0 (MVP). **Fora do escopo:** n8n, IA, alertas, VPS 24/7, login de usuários, outras regiões.
+**Versão:** v1.0 (MVP). **Fora do escopo:** n8n, IA, alertas, VPS 24/7, contas de usuário, outras regiões.
 
 ---
 
@@ -36,10 +36,13 @@ radar-trends/
 │   ├── 01_schema.sql         tabelas, RLS e função ingest_collection
 │   ├── 02_views.sql          v_latest_ranking, v_term_history
 │   ├── 03_movers.sql         v_movers (Emergindo)
-│   └── 04_term_summary.sql   term_summary (ranking por período)
+│   ├── 04_term_summary.sql   term_summary (ranking por período)
+│   ├── 05_term_rankings.sql  term_rankings (aba Rankings)
+│   ├── 06_news.sql           fontes RSS e notícias
+│   └── 07_news_categories_and_sources.sql  categorias e fontes iniciais
 ├── web/
-│   ├── api/collect.mjs       função serverless do botão "Coletar agora"
-│   ├── src/                  main.jsx, app.jsx, supabase.js, index.css
+│   ├── api/                  funções serverless de coleta e administração de RSS
+│   ├── src/                  interface React
 │   ├── .env                  NUNCA versionar
 │   └── package.json
 ├── .gitignore
@@ -54,7 +57,7 @@ radar-trends/
 
 1. Crie o projeto no Supabase.
 2. Em **Project Settings → API**, anote a URL, a chave **pública** (anon/publishable) e a chave **secreta** (service_role/secret).
-3. No **SQL Editor**, rode nesta ordem: `01_schema.sql`, `02_views.sql`, `03_movers.sql`, `04_term_summary.sql`.
+3. No **SQL Editor**, rode nesta ordem: `01_schema.sql`, `02_views.sql`, `03_movers.sql`, `04_term_summary.sql`, `05_term_rankings.sql`, `06_news.sql` e `07_news_categories_and_sources.sql`.
 
 ## 2. Coletor (PC)
 
@@ -124,7 +127,8 @@ VITE_SUPABASE_ANON_KEY=chave_publica
 |---|---|---|
 | `VITE_SUPABASE_URL` | site e função | pública |
 | `VITE_SUPABASE_ANON_KEY` | site | chave pública |
-| `SUPABASE_SECRET_KEY` | só a função `/api/collect` | **secreta, nunca com prefixo `VITE_`** |
+| `SUPABASE_SECRET_KEY` | funções serverless de coleta e notícias | **secreta, nunca com prefixo `VITE_`** |
+| `RADAR_ADMIN_PASSWORD` | só a função `/api/news-admin` | Senha única com pelo menos 16 caracteres |
 
 Depois de alterar variáveis, faça **Redeploy**: elas entram no build.
 
@@ -141,6 +145,11 @@ Deploy novo não aparece? Veja em **Deployments** se o último está com erro. Q
 - **Aba Pesquisa:** compara até três termos no Brasil pelo gráfico incorporado do Google Trends, com dados diários dos últimos 30 ou 90 dias. O índice de 0 a 100 representa interesse relativo, não o total absoluto de buscas.
 - **Detalhe do termo:** gráfico de posição (1 no topo). Trechos sem linha = o termo saiu da lista naquela coleta.
 - **Coletar agora:** dispara uma coleta pela função da Vercel. Há intervalo mínimo de 10 minutos entre quaisquer duas coletas (agendadas ou manuais). Coletas manuais ficam com `source = 'google_trends_rss_manual'`.
+- **Notícias:** o dashboard mostra a notícia mais recente de cada feed ativo e uma aba Notícias com navegação por agência. O botão de atualização exige sessão de administrador e aplica intervalo mínimo de 5 minutos por fonte.
+- **Categorias:** as notícias são agrupadas em Brasil, Internacional, Política, Economia e Breaking News. A migração `07_news_categories_and_sources.sql` cadastra as dez fontes iniciais e suas categorias; fontes e categorias podem ser editadas pelo painel Admin.
+- **Admin de RSS:** cadastra, edita, ativa/desativa e exclui fontes. Defina `RADAR_ADMIN_PASSWORD` (mínimo 16 caracteres, de preferência uma senha longa e exclusiva) nas variáveis do servidor Vercel. A senha nunca é salva no navegador; o acesso usa cookie `HttpOnly`, `SameSite=Strict`, com validade de 8 horas. Os feeds precisam usar HTTPS e apontar para endereços públicos.
+- **Reuters, CNN e AP:** as URLs sugeridas são buscas do Google Notícias limitadas às últimas 24 horas, não feeds oficiais dessas agências. O próprio feed do Google Notícias informa restrições de uso; confira os termos aplicáveis antes de usar fora de um leitor pessoal não comercial.
+- **Atualização local:** as rotas `/api/*` são funções da Vercel; para exercitar cadastro e atualização dos feeds, publique o site ou use um ambiente local que execute as funções serverless. O dashboard local pode ler fontes já cadastradas no Supabase.
 - **Aviso de dados antigos:** aparece após 2 horas sem coleta.
 
 ## Segurança (checklist)

@@ -175,3 +175,54 @@ a.news:hover { text-decoration: underline; }
   .search-open { width: 100%; text-align: center; }
   .search-chart, .search-chart iframe { min-height: 420px; }
 }
+
+.news-overview { margin-top: 24px; }
+.news-overview-category { margin-top: 18px; }
+.news-overview-category > h3 { margin: 0; font-size: .95rem; }
+.news-source-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 14px; }
+.news-source-card { min-width: 0; padding: 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+.news-card-heading, .news-heading, .news-feed-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.news-card-heading .meta { margin: 0; font-size: .72rem; text-align: right; }
+.news-card-title { display: block; margin-top: 10px; color: inherit; font-weight: 650; line-height: 1.4; text-decoration: none; }
+.news-card-title:hover, .news-article-list a:hover { color: var(--accent); }
+.news-card-link { margin-top: 12px; padding: 0; border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; font-size: .82rem; font-weight: 650; }
+.news-hub { margin-top: 18px; }
+.news-heading { align-items: center; }
+.news-heading .section-title { margin-top: 0; }
+.news-browser { display: grid; grid-template-columns: minmax(150px, 210px) minmax(0, 1fr); gap: 12px 16px; margin-top: 18px; align-items: start; }
+.news-category-tabs { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.news-category-tabs button { padding: 8px 13px; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font: inherit; font-size: .86rem; }
+.news-category-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.news-source-tabs { display: grid; gap: 6px; position: sticky; top: 12px; }
+.news-source-tabs button { padding: 10px 12px; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 8px; text-align: left; cursor: pointer; font: inherit; }
+.news-source-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.news-feed, .admin-panel { min-width: 0; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+.news-feed-heading { align-items: center; }
+.news-feed-heading h3, .admin-panel h3 { margin: 0; font-size: 1.05rem; }
+.news-feed-heading .meta { margin-top: 4px; }
+.news-article-list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 16px; }
+.news-article-list li { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.news-article-list li:last-child { padding-bottom: 0; border-bottom: 0; }
+.news-article-list a { color: inherit; font-weight: 650; text-decoration: none; }
+.news-article-list time { display: block; margin-top: 5px; color: var(--muted); font-size: .76rem; }
+.news-article-list p { margin: 7px 0 0; color: var(--muted); font-size: .88rem; line-height: 1.5; }
+.admin-panel { margin-top: 18px; }
+.admin-login, .admin-form { display: grid; gap: 12px; margin-top: 16px; }
+.admin-login { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.admin-panel h4 { margin: 0; }
+.admin-source-list { display: grid; gap: 8px; margin-top: 16px; }
+.admin-source-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-active { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .85rem; }
+.admin-active input { width: 16px; height: 16px; }
+.admin-categories { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+.admin-categories legend { padding: 0 5px; color: var(--muted); font-size: .82rem; }
+@media (max-width: 600px) {
+  .news-heading, .news-feed-heading { align-items: stretch; flex-direction: column; }
+  .news-heading { flex-direction: row; align-items: center; }
+  .news-browser { grid-template-columns: minmax(0, 1fr); }
+  .news-category-tabs { grid-column: 1; }
+  .news-source-tabs { display: flex; overflow-x: auto; position: static; padding-bottom: 4px; }
+  .news-source-tabs button { flex: 0 0 auto; text-align: center; }
+  .admin-login { grid-template-columns: minmax(0, 1fr); }
+  .admin-login .collect { width: 100%; }
+}

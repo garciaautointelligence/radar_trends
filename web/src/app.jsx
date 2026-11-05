@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from './supabase'
+import NewsHub from './NewsHub'
 
 const REGION = 'BR'
 const INTERVAL_MIN = 30
@@ -222,6 +223,7 @@ function TrendingDashboard({ rows, refreshKey }) {
           <span className="lead-rank">#{dashboardStats.lead.bestRank}</span>
         </article>}
         {dashboardStats.risingTopics.length === 0 && <p className="meta">Nenhum assunto subiu nesta hora. Os assuntos monitorados aparecem abaixo.</p>}
+        <NewsHub overviewOnly />
         <h2 className="dashboard-section-title">Assuntos monitorados</h2>
         <div className="topic-grid">
           {topics.map((topic) => (
@@ -983,6 +985,7 @@ export default function App() {
             {[
               ['agora', 'Agora'],
               ['rankings', 'Rankings'],
+              ['noticias', 'Notícias'],
               ['pesquisa', 'Pesquisa'],
               ...Object.entries(PERIODS).map(([key, p]) => [key, p.label]),
             ].map(([key, label]) => (
@@ -998,6 +1001,8 @@ export default function App() {
 
           {view === 'pesquisa' ? (
             <SearchComparison />
+          ) : view === 'noticias' ? (
+            <NewsHub refreshKey={refreshKey} />
           ) : view === 'dashboard' ? (
             <TrendingDashboard rows={rows} refreshKey={refreshKey} />
           ) : view === 'agora' ? (
