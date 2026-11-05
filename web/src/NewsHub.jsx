@@ -50,20 +50,20 @@ function AgencyLogo({ source, onClick }) {
     }
   }
   if (!domain) {
-    return (
-      <button
-        className="agency-logo-button"
-        type="button"
-        aria-label={`Abrir as últimas 10 notícias de ${source.name}`}
-        onClick={onClick}
-      >
-        <span aria-hidden="true">{source.name.slice(0, 2).toUpperCase()}</span>
-      </button>
-    )
+    const fallback = <span aria-hidden="true">{source.name.slice(0, 2).toUpperCase()}</span>
+    return onClick
+      ? <button className="agency-logo-button" type="button" aria-label={`Abrir as últimas 10 notícias de ${source.name}`} onClick={onClick}>{fallback}</button>
+      : <span className="agency-logo-button" aria-hidden="true">{fallback}</span>
   }
   const logoUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`
 
-  return (
+  const image = !failed ? (
+    <img src={logoUrl} alt="" onError={() => setFailed(true)} />
+  ) : (
+    <span aria-hidden="true">{source.name.slice(0, 2).toUpperCase()}</span>
+  )
+
+  return onClick ? (
     <button
       className="agency-logo-button"
       type="button"
@@ -71,13 +71,9 @@ function AgencyLogo({ source, onClick }) {
       title={`Ver últimas notícias de ${source.name}`}
       onClick={onClick}
     >
-      {!failed ? (
-        <img src={logoUrl} alt="" onError={() => setFailed(true)} />
-      ) : (
-        <span aria-hidden="true">{source.name.slice(0, 2).toUpperCase()}</span>
-      )}
+      {image}
     </button>
-  )
+  ) : <span className="agency-logo-button" aria-hidden="true">{image}</span>
 }
 
 function NewsCards({ sources, articles, onSelect }) {
@@ -139,8 +135,11 @@ export default function NewsHub({ refreshKey = 0 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [adminOpen, setAdminOpen] = useState(false)
+  const [sourceFormOpen, setSourceFormOpen] = useState(false)
   const [authenticated, setAuthenticated] = useState(false)
   const [adminSources, setAdminSources] = useState([])
+  const [refreshingSourceId, setRefreshingSourceId] = useState(null)
+  const [refreshErrors, setRefreshErrors] = useState({})
   const [password, setPassword] = useState('')
   const [form, setForm] = useState({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })
   const [busy, setBusy] = useState(false)
@@ -234,6 +233,7 @@ export default function NewsHub({ refreshKey = 0 }) {
     try {
       await postAdmin('save', { source: form })
       setForm({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })
+      setSourceFormOpen(false)
       await Promise.all([loadAdminSources(), loadNews()])
       setNotice({ type: 'ok', text: 'Fonte salva.' })
     } catch (saveError) {
@@ -244,20 +244,32 @@ export default function NewsHub({ refreshKey = 0 }) {
   }
 
   const refreshSource = async (sourceId) => {
-    setBusy(true)
+    setRefreshingSourceId(sourceId)
+    setRefreshErrors((current) => ({ ...current, [sourceId]: null }))
     setNotice(null)
     try {
       const result = await postAdmin('refresh', { source_id: sourceId })
       await Promise.all([loadNews(), authenticated ? loadAdminSources() : Promise.resolve()])
       setNotice({ type: 'ok', text: `${result.items} notícias atualizadas.` })
     } catch (refreshError) {
+      setRefreshErrors((current) => ({ ...current, [sourceId]: refreshError.message }))
+      if (authenticated) {
+        try {
+          await loadAdminSources()
+        } catch (adminError) {
+          setRefreshErrors((current) => ({
+            ...current,
+            [sourceId]: `${refreshError.message} Também não foi possível atualizar o status: ${adminError.message}`,
+          }))
+        }
+      }
       if (refreshError.status === 401) {
         setAdminOpen(true)
         setAuthenticated(false)
       }
       setNotice({ type: 'error', text: refreshError.message })
     } finally {
-      setBusy(false)
+      setRefreshingSourceId(null)
     }
   }
 
@@ -268,6 +280,7 @@ export default function NewsHub({ refreshKey = 0 }) {
     try {
       await postAdmin('delete', { source_id: sourceId })
       setForm({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })
+      setSourceFormOpen(false)
       await Promise.all([loadAdminSources(), loadNews()])
       setNotice({ type: 'ok', text: 'Fonte excluída.' })
     } catch (deleteError) {
@@ -312,13 +325,16 @@ export default function NewsHub({ refreshKey = 0 }) {
   }
 
   useEffect(() => {
-    if (!selectedSource) return undefined
+    if (!selectedSource && !sourceFormOpen) return undefined
     const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setSelectedSource(null)
+      if (event.key === 'Escape') {
+        if (sourceFormOpen) setSourceFormOpen(false)
+        else setSelectedSource(null)
+      }
     }
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [selectedSource])
+  }, [selectedSource, sourceFormOpen])
 
   return (
     <section className="news-hub">
@@ -444,40 +460,102 @@ export default function NewsHub({ refreshKey = 0 }) {
               <div className="admin-source-list">
                 {adminSources.map((source) => (
                   <div className="admin-source-row" key={source.id}>
-                    <button
-                      type="button"
-                      className="dashboard-button"
-                      onClick={() => setForm({
-                        id: source.id,
-                        name: source.name,
-                        feed_url: source.feed_url,
-                        categories: source.categories ?? [],
-                        active: source.active,
-                      })}
-                    >
-                      {source.name} {source.active ? '' : '(inativa)'}
-                    </button>
-                    <button
-                      type="button"
-                      className="dashboard-button"
-                      disabled={busy || !source.active}
-                      onClick={() => refreshSource(source.id)}
-                    >
-                      Atualizar feed
-                    </button>
-                    <button
-                      type="button"
-                      className="dashboard-button"
-                      disabled={busy}
-                      onClick={() => deleteSource(source.id)}
-                    >
-                      Excluir
-                    </button>
+                    <AgencyLogo source={source} />
+                    <div className="admin-source-info">
+                      <strong>{source.name}</strong>
+                      <span className={`admin-feed-status${source.last_fetched_at ? ' updated' : ''}${refreshErrors[source.id] || (source.last_attempted_at && (!source.last_fetched_at || new Date(source.last_attempted_at) > new Date(source.last_fetched_at))) ? ' failed' : ''}`}>
+                        {refreshErrors[source.id] ? (
+                          refreshErrors[source.id]
+                        ) : source.last_attempted_at && (!source.last_fetched_at || new Date(source.last_attempted_at) > new Date(source.last_fetched_at)) ? (
+                          <>Última tentativa {fmtDate(source.last_attempted_at)} · sem atualização concluída</>
+                        ) : source.last_fetched_at ? (
+                          <><span aria-hidden="true">✓</span> Atualizado {fmtDate(source.last_fetched_at)}</>
+                        ) : (
+                          'Aguardando primeira atualização'
+                        )}
+                      </span>
+                    </div>
+                    <div className="admin-source-actions">
+                      <button
+                        type="button"
+                        className="admin-refresh-button"
+                        disabled={busy || refreshingSourceId !== null || !source.active}
+                        onClick={() => refreshSource(source.id)}
+                      >
+                        {refreshingSourceId === source.id ? (
+                          <><span className="admin-spinner" aria-hidden="true" /> Atualizando</>
+                        ) : (
+                          'Atualizar'
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-icon-button"
+                        aria-label={`Editar ${source.name}`}
+                        title="Editar fonte"
+                        disabled={busy || refreshingSourceId !== null}
+                        onClick={() => {
+                          setForm({
+                            id: source.id,
+                            name: source.name,
+                            feed_url: source.feed_url,
+                            categories: source.categories ?? [],
+                            active: source.active,
+                          })
+                          setSourceFormOpen(true)
+                        }}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-icon-button danger"
+                        aria-label={`Excluir ${source.name}`}
+                        title="Excluir fonte"
+                        disabled={busy || refreshingSourceId !== null}
+                        onClick={() => deleteSource(source.id)}
+                      >
+                        ×
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
-              <form className="admin-form" onSubmit={saveSource}>
-                <h4>{form.id ? 'Editar agência' : 'Adicionar agência'}</h4>
+              <button
+                type="button"
+                className="admin-add-source"
+                onClick={() => {
+                  setForm({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })
+                  setSourceFormOpen(true)
+                }}
+              >
+                <span aria-hidden="true">＋</span> Cadastrar agência + RSS
+              </button>
+              <div className="admin-session-actions">
+                <button type="button" className="dashboard-button" disabled={busy} onClick={logout}>
+                  Sair do admin
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {sourceFormOpen && authenticated && (
+        <div className="news-modal-backdrop admin-modal-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !busy) setSourceFormOpen(false)
+        }}>
+          <section className="news-modal admin-source-modal" role="dialog" aria-modal="true" aria-labelledby="admin-source-form-title">
+            <header className="news-modal-header">
+              <div>
+                <p className="news-kicker">GERENCIAR FONTES</p>
+                <h3 id="admin-source-form-title">{form.id ? 'Editar agência' : 'Cadastrar agência'}</h3>
+              </div>
+              <button type="button" className="news-modal-close" aria-label="Fechar formulário" disabled={busy} onClick={() => setSourceFormOpen(false)}>
+                ×
+              </button>
+            </header>
+            <form className="admin-form" onSubmit={saveSource}>
                 <label className="search-field">
                   <span>Nome exibido</span>
                   <input
@@ -530,22 +608,12 @@ export default function NewsHub({ refreshKey = 0 }) {
                   <button className="collect" type="submit" disabled={busy || form.categories.length === 0}>
                     {busy ? 'Salvando…' : 'Salvar fonte'}
                   </button>
-                  {form.id && (
-                    <button
-                      type="button"
-                      className="dashboard-button"
-                      onClick={() => setForm({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })}
-                    >
-                      Cancelar edição
-                    </button>
-                  )}
-                  <button type="button" className="dashboard-button" disabled={busy} onClick={logout}>
-                    Sair do admin
+                  <button type="button" className="dashboard-button" disabled={busy} onClick={() => setSourceFormOpen(false)}>
+                    Cancelar
                   </button>
                 </div>
               </form>
-            </>
-          )}
+          </section>
         </div>
       )}
     </section>

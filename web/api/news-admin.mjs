@@ -327,7 +327,7 @@ export default async function handler(req, res) {
     try {
       const { data, error } = await getSupabase()
         .from('news_sources')
-        .select('id, name, feed_url, categories, active, last_fetched_at')
+        .select('id, name, feed_url, categories, active, last_fetched_at, last_attempted_at')
         .order('name')
       if (error) throw error
       return res.status(200).json({ ok: true, sources: data })

@@ -213,12 +213,36 @@ a.news:hover { text-decoration: underline; }
 .news-modal-list a { color: var(--text); font-size: .92rem; font-weight: 650; line-height: 1.45; text-decoration: none; }
 .news-modal-list time { display: block; margin-top: 5px; color: var(--muted); font-size: .72rem; }
 .news-modal-list p { margin: 7px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.5; }
-.admin-panel { margin-top: 18px; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+.admin-panel { margin-top: 18px; padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 12px 35px rgba(20, 28, 48, .07); }
 .admin-login, .admin-form { display: grid; gap: 12px; margin-top: 16px; }
 .admin-login { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
 .admin-panel h3, .admin-panel h4 { margin: 0; }
-.admin-source-list { display: grid; gap: 8px; margin-top: 16px; }
-.admin-source-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-source-list { display: grid; gap: 8px; margin-top: 18px; }
+.admin-source-row { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 11px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; }
+.admin-source-row .agency-logo-button { flex-basis: 34px; width: 34px; height: 34px; padding: 6px; border-radius: 9px; }
+.admin-source-info { display: grid; flex: 1; min-width: 0; gap: 4px; }
+.admin-source-info > strong { overflow: hidden; color: var(--text); font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
+.admin-feed-status { display: flex; align-items: center; gap: 5px; overflow: hidden; color: var(--muted); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.admin-feed-status.updated { color: #198754; }
+.admin-feed-status.updated > span { display: grid; flex: 0 0 15px; width: 15px; height: 15px; place-items: center; background: rgba(25, 135, 84, .12); border-radius: 50%; font-size: .65rem; font-weight: 900; }
+.admin-feed-status.failed { color: #c62828; }
+.admin-source-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+.admin-refresh-button { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 11px; color: var(--accent); background: var(--card); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font: inherit; font-size: .76rem; font-weight: 700; }
+.admin-refresh-button:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+.admin-refresh-button:disabled, .admin-icon-button:disabled { opacity: .55; cursor: not-allowed; }
+.admin-spinner { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: admin-spin .7s linear infinite; }
+.admin-icon-button { display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; padding: 0; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 8px; cursor: pointer; font: inherit; font-size: 1rem; }
+.admin-icon-button:hover { color: var(--text); background: var(--card); border-color: var(--border); }
+.admin-icon-button.danger:hover { color: #c62828; border-color: rgba(198, 40, 40, .25); }
+.admin-add-source { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; gap: 8px; margin-top: 14px; color: var(--accent); background: transparent; border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--border)); border-radius: 10px; cursor: pointer; font: inherit; font-size: .84rem; font-weight: 700; transition: background .15s, border-color .15s; }
+.admin-add-source:hover { background: color-mix(in srgb, var(--accent) 6%, var(--card)); border-style: solid; }
+.admin-add-source > span { font-size: 1.15rem; }
+.admin-session-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+.admin-source-modal { width: min(560px, 100%); }
+.admin-source-modal .admin-form { margin-top: 20px; }
+.admin-source-modal .admin-categories { gap: 10px 14px; }
+.admin-source-modal .actions { margin-top: 4px; }
+@keyframes admin-spin { to { transform: rotate(360deg); } }
 .admin-active { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .85rem; }
 .admin-active input { width: 16px; height: 16px; }
 .admin-categories { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
@@ -232,4 +256,11 @@ a.news:hover { text-decoration: underline; }
   .news-modal { padding: 17px; }
   .admin-login { grid-template-columns: minmax(0, 1fr); }
   .admin-login .collect { width: 100%; }
+  .admin-panel { padding: 14px; }
+  .admin-source-row { flex-wrap: wrap; gap: 9px; padding: 10px; }
+  .admin-source-info { flex-basis: calc(100% - 58px); }
+  .admin-source-actions { width: 100%; justify-content: flex-end; }
+  .admin-refresh-button { margin-right: auto; }
+  .admin-modal-backdrop { align-items: end; padding: 10px; }
+  .admin-source-modal { max-height: 90vh; border-radius: 18px 18px 12px 12px; }
 }
