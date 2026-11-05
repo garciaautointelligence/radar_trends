@@ -223,7 +223,6 @@ function TrendingDashboard({ rows, refreshKey }) {
           <span className="lead-rank">#{dashboardStats.lead.bestRank}</span>
         </article>}
         {dashboardStats.risingTopics.length === 0 && <p className="meta">Nenhum assunto subiu nesta hora. Os assuntos monitorados aparecem abaixo.</p>}
-        <NewsHub overviewOnly />
         <h2 className="dashboard-section-title">Assuntos monitorados</h2>
         <div className="topic-grid">
           {topics.map((topic) => (
@@ -858,14 +857,15 @@ export default function App() {
   const [rows, setRows] = useState([])
   const [movers, setMovers] = useState([])
   const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
-  const [view, setView] = useState('agora') // 'agora' | 'hoje' | '24h' | '7d'
+  const [view, setView] = useState('noticias')
   const [refreshKey, setRefreshKey] = useState(0)
   const [collecting, setCollecting] = useState(false)
   const [notice, setNotice] = useState(null) // { type: 'ok' | 'warn' | 'error', text }
 
   const load = useCallback(async () => {
+    setLoading(true)
     const [r, m] = await Promise.all([
       supabase.from('v_latest_ranking').select('*').eq('region', REGION).order('rank'),
       supabase.from('v_movers').select('*').eq('region', REGION),
@@ -880,8 +880,9 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (view === 'noticias' && !termKey) return
     load()
-  }, [load])
+  }, [load, termKey, view])
 
   useEffect(() => {
     if (view !== 'dashboard') return undefined
@@ -955,17 +956,16 @@ export default function App() {
             Radar
           </a>
         </h1>
-        <p className="sub">O que o Brasil está pesquisando agora</p>
-        {updatedAt && <p className="meta">Atualizado em {fmtDate(updatedAt)}</p>}
-        {stale && <p className="warn">Dados com mais de 2 horas.</p>}
-        <div className="actions">
-          <button className={`dashboard-button${view === 'dashboard' ? ' active' : ''}`} onClick={() => setView('dashboard')}>
-            Dashboard
-          </button>
-          <button className="collect" onClick={collectNow} disabled={collecting}>
-            {collecting ? 'Coletando…' : 'Coletar agora'}
-          </button>
-        </div>
+        <p className="sub">Notícias e tendências em um só lugar</p>
+        {view !== 'noticias' && updatedAt && <p className="meta">Google Trends atualizado em {fmtDate(updatedAt)}</p>}
+        {view !== 'noticias' && stale && <p className="warn">Dados com mais de 2 horas.</p>}
+        {view !== 'noticias' && (
+          <div className="actions">
+            <button className="collect" onClick={collectNow} disabled={collecting}>
+              {collecting ? 'Coletando…' : 'Coletar Trends'}
+            </button>
+          </div>
+        )}
         {notice && <p className={`notice ${notice.type}`}>{notice.text}</p>}
       </header>
 
@@ -983,9 +983,10 @@ export default function App() {
         <>
           <div className="tabs">
             {[
-              ['agora', 'Agora'],
-              ['rankings', 'Rankings'],
               ['noticias', 'Notícias'],
+              ['agora', 'Google Trends'],
+              ['dashboard', 'Panorama Trends'],
+              ['rankings', 'Rankings'],
               ['pesquisa', 'Pesquisa'],
               ...Object.entries(PERIODS).map(([key, p]) => [key, p.label]),
             ].map(([key, label]) => (

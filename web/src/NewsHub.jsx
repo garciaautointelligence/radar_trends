@@ -2,6 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 
 const NEWS_CATEGORIES = ['Brasil', 'Internacional', 'Política', 'Economia', 'Breaking News']
+const AGENCY_DOMAINS = {
+  G1: 'g1.globo.com',
+  'EBC / Agência Brasil': 'agenciabrasil.ebc.com.br',
+  'UOL Notícias': 'noticias.uol.com.br',
+  Metrópoles: 'metropoles.com',
+  Reuters: 'reuters.com',
+  'CNN International': 'edition.cnn.com',
+  'BBC News': 'bbc.com',
+  'Associated Press (AP)': 'apnews.com',
+  'Agência Senado': 'senado.leg.br',
+  'Agência Câmara': 'camara.leg.br',
+}
 
 const fmtDate = (iso) =>
   iso
@@ -27,11 +39,55 @@ async function postAdmin(action, values = {}) {
   return body
 }
 
+function AgencyLogo({ source, onClick }) {
+  const [failed, setFailed] = useState(false)
+  let domain = AGENCY_DOMAINS[source.name]
+  if (!domain) {
+    try {
+      domain = new URL(source.feed_url).hostname
+    } catch {
+      domain = ''
+    }
+  }
+  if (!domain) {
+    return (
+      <button
+        className="agency-logo-button"
+        type="button"
+        aria-label={`Abrir as últimas 10 notícias de ${source.name}`}
+        onClick={onClick}
+      >
+        <span aria-hidden="true">{source.name.slice(0, 2).toUpperCase()}</span>
+      </button>
+    )
+  }
+  const logoUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`
+
+  return (
+    <button
+      className="agency-logo-button"
+      type="button"
+      aria-label={`Abrir as últimas 10 notícias de ${source.name}`}
+      title={`Ver últimas notícias de ${source.name}`}
+      onClick={onClick}
+    >
+      {!failed ? (
+        <img src={logoUrl} alt="" onError={() => setFailed(true)} />
+      ) : (
+        <span aria-hidden="true">{source.name.slice(0, 2).toUpperCase()}</span>
+      )}
+    </button>
+  )
+}
+
 function NewsCards({ sources, articles, onSelect }) {
   const latestBySource = useMemo(() => {
     const latest = new Map()
     articles.forEach((article) => {
-      if (!latest.has(article.source_id)) latest.set(article.source_id, article)
+      const current = latest.get(article.source_id)
+      if (!current || (article.published_at && new Date(article.published_at) > new Date(current.published_at || 0))) {
+        latest.set(article.source_id, article)
+      }
     })
     return latest
   }, [articles])
@@ -46,22 +102,28 @@ function NewsCards({ sources, articles, onSelect }) {
         const article = latestBySource.get(source.id)
         return (
           <article className="news-source-card" key={source.id}>
-            <div className="news-card-heading">
-              <span className="eyebrow">{source.name}</span>
-              {article?.published_at && <time className="meta">{fmtDate(article.published_at)}</time>}
+            <div className="news-card-identity">
+              <AgencyLogo source={source} onClick={() => onSelect?.(source.id)} />
+              <div className="news-card-source">
+                <strong>{source.name}</strong>
+                <div className="news-category-badges">
+                  {(source.categories ?? []).map((category) => (
+                    <span className="news-category-badge" key={category}>{category}</span>
+                  ))}
+                </div>
+              </div>
             </div>
             {article ? (
-              <a href={article.url} target="_blank" rel="noreferrer" className="news-card-title">
-                {article.title}
-              </a>
+              <>
+                <a href={article.url} target="_blank" rel="noreferrer" className="news-card-title">
+                  {article.title}
+                </a>
+                <time className="news-card-time">{fmtDate(article.published_at)}</time>
+              </>
             ) : (
-              <p className="meta">Ainda não há notícias coletadas.</p>
+              <p className="news-card-empty">Ainda não há notícias coletadas.</p>
             )}
-            {onSelect && (
-              <button className="news-card-link" type="button" onClick={() => onSelect(source.id)}>
-                Ver notícias →
-              </button>
-            )}
+            {onSelect && <span className="news-card-hint">Toque no logo para ver as 10 últimas</span>}
           </article>
         )
       })}
@@ -69,10 +131,10 @@ function NewsCards({ sources, articles, onSelect }) {
   )
 }
 
-export default function NewsHub({ overviewOnly = false, refreshKey = 0 }) {
+export default function NewsHub({ refreshKey = 0 }) {
   const [sources, setSources] = useState([])
   const [articles, setArticles] = useState([])
-  const [selectedCategory, setSelectedCategory] = useState('Brasil')
+  const [selectedCategory, setSelectedCategory] = useState('Todas')
   const [selectedSource, setSelectedSource] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -88,27 +150,32 @@ export default function NewsHub({ overviewOnly = false, refreshKey = 0 }) {
     setLoading(true)
     setError(null)
     try {
-      const [sourceResult, articleResult] = await Promise.all([
-        supabase
-          .from('news_sources')
-          .select('id, name, categories, last_fetched_at')
-          .eq('active', true)
-          .order('name'),
-        supabase
-          .from('news_articles')
-          .select('id, source_id, title, url, summary, published_at')
-          .order('published_at', { ascending: false, nullsFirst: false })
-          .limit(300),
-      ])
-      if (sourceResult.error || articleResult.error) {
-        setError((sourceResult.error || articleResult.error).message)
+      const sourceResult = await supabase
+        .from('news_sources')
+        .select('id, name, feed_url, categories, last_fetched_at')
+        .eq('active', true)
+        .order('name')
+      if (sourceResult.error) {
+        setError(sourceResult.error.message)
       } else {
         const activeSources = sourceResult.data ?? []
-        const sourceIds = new Set(activeSources.map((source) => source.id))
+        const articleResults = await Promise.all(activeSources.map((source) =>
+          supabase
+            .from('news_articles')
+            .select('id, source_id, title, url, summary, published_at')
+            .eq('source_id', source.id)
+            .order('published_at', { ascending: false, nullsFirst: false })
+            .limit(10)
+        ))
+        const articleError = articleResults.find((result) => result.error)?.error
+        if (articleError) {
+          setError(articleError.message)
+          return
+        }
         setSources(activeSources)
-        setArticles((articleResult.data ?? []).filter((article) => sourceIds.has(article.source_id)))
+        setArticles(articleResults.flatMap((result) => result.data ?? []))
         setSelectedSource((current) =>
-          activeSources.some((source) => source.id === current) ? current : activeSources[0]?.id ?? null
+          activeSources.some((source) => source.id === current) ? current : null
         )
       }
     } catch (loadError) {
@@ -224,47 +291,42 @@ export default function NewsHub({ overviewOnly = false, refreshKey = 0 }) {
     }
   }
 
-  if (overviewOnly) {
-    return (
-      <section className="news-overview">
-        <h2 className="dashboard-section-title">Últimas notícias por agência</h2>
-        {error && <p className="warn">Erro ao carregar notícias: {error}</p>}
-        {loading && <p className="meta">Carregando notícias…</p>}
-        {!loading && !error && NEWS_CATEGORIES.map((category) => {
-          const categorySources = sources.filter((source) => source.categories?.includes(category))
-          if (!categorySources.length) return null
-          return (
-            <section className="news-overview-category" key={category}>
-              <h3>{category}</h3>
-              <NewsCards sources={categorySources} articles={articles} />
-            </section>
-          )
-        })}
-      </section>
-    )
-  }
-
-  const availableCategories = NEWS_CATEGORIES.filter((category) =>
-    sources.some((source) => source.categories?.includes(category))
-  )
+  const availableCategories = ['Todas', ...NEWS_CATEGORIES]
   const activeCategory = availableCategories.includes(selectedCategory)
     ? selectedCategory
-    : availableCategories[0]
-  const visibleSources = sources.filter((source) => source.categories?.includes(activeCategory))
-  const activeSource = visibleSources.find((source) => source.id === selectedSource) ?? visibleSources[0]
-  const sourceArticles = articles.filter((article) => article.source_id === activeSource?.id)
+    : 'Todas'
+  const visibleSources = activeCategory === 'Todas'
+    ? sources
+    : sources.filter((source) => source.categories?.includes(activeCategory))
+  const activeSource = sources.find((source) => source.id === selectedSource)
+  const sourceArticles = articles
+    .filter((article) => article.source_id === activeSource?.id)
+    .sort((a, b) => {
+      if (!a.published_at) return 1
+      if (!b.published_at) return -1
+      return new Date(b.published_at) - new Date(a.published_at)
+    })
+    .slice(0, 10)
   const selectSource = (sourceId) => {
-    const source = sources.find((item) => item.id === sourceId)
-    if (source?.categories?.length) setSelectedCategory(source.categories[0])
     setSelectedSource(sourceId)
   }
+
+  useEffect(() => {
+    if (!selectedSource) return undefined
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setSelectedSource(null)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [selectedSource])
 
   return (
     <section className="news-hub">
       <div className="news-heading">
         <div>
-          <h2 className="section-title">Notícias</h2>
-          <p className="meta">Últimas publicações nos feeds cadastrados.</p>
+          <p className="news-kicker">PANORAMA DE NOTÍCIAS</p>
+          <h2 className="section-title">Últimas manchetes</h2>
+          <p className="meta">Uma visão rápida de todas as fontes. Selecione um logo para ver as 10 últimas notícias.</p>
         </div>
         <button className="dashboard-button" type="button" onClick={openAdmin}>
           Admin · fontes RSS
@@ -274,10 +336,12 @@ export default function NewsHub({ overviewOnly = false, refreshKey = 0 }) {
       {error && <p className="warn">Erro ao carregar notícias: {error}</p>}
       {notice && <p className={`notice ${notice.type}`} role="status">{notice.text}</p>}
       {loading && <p className="meta">Carregando notícias…</p>}
-      {!loading && !error && <NewsCards sources={sources} articles={articles} onSelect={selectSource} />}
+      {!loading && !error && !sources.length && (
+        <p className="news-empty">Nenhuma fonte ativa. Cadastre ou ative feeds no painel Admin.</p>
+      )}
 
       {!loading && sources.length > 0 && (
-        <div className="news-browser">
+        <>
           <nav className="news-category-tabs" aria-label="Categorias de notícias">
             {availableCategories.map((category) => (
               <button
@@ -285,52 +349,54 @@ export default function NewsHub({ overviewOnly = false, refreshKey = 0 }) {
                 key={category}
                 className={category === activeCategory ? 'active' : ''}
                 aria-pressed={category === activeCategory}
-                onClick={() => {
-                  setSelectedCategory(category)
-                  const firstSource = sources.find((source) => source.categories?.includes(category))
-                  setSelectedSource(firstSource?.id ?? null)
-                }}
+                onClick={() => setSelectedCategory(category)}
               >
                 {category}
               </button>
             ))}
           </nav>
-          <nav className="news-source-tabs" aria-label={`Agências de ${activeCategory}`}>
-            {visibleSources.map((source) => (
+          <NewsCards sources={visibleSources} articles={articles} onSelect={selectSource} />
+        </>
+      )}
+
+      {activeSource && (
+        <div className="news-modal-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setSelectedSource(null)
+        }}>
+          <section
+            className="news-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="news-modal-title"
+          >
+            <header className="news-modal-header">
+              <div className="news-card-identity">
+                <AgencyLogo source={activeSource} onClick={() => setSelectedSource(null)} />
+                <div>
+                  <h3 id="news-modal-title">{activeSource.name}</h3>
+                  <div className="news-category-badges">
+                    {(activeSource.categories ?? []).map((category) => (
+                      <span className="news-category-badge" key={category}>{category}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
               <button
                 type="button"
-                key={source.id}
-                className={source.id === activeSource?.id ? 'active' : ''}
-                aria-current={source.id === activeSource?.id ? 'page' : undefined}
-                onClick={() => setSelectedSource(source.id)}
+                className="news-modal-close"
+                aria-label="Fechar notícias"
+                onClick={() => setSelectedSource(null)}
               >
-                {source.name}
+                ×
               </button>
-            ))}
-          </nav>
-          <div className="news-feed">
-            {activeSource && (
-              <div className="news-feed-heading">
-                <div>
-                  <h3>{activeSource.name}</h3>
-                  <p className="meta">
-                    {activeSource.last_fetched_at
-                      ? `Atualizado em ${fmtDate(activeSource.last_fetched_at)}`
-                      : 'Ainda não atualizado'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="collect"
-                  disabled={busy}
-                  onClick={() => refreshSource(activeSource.id)}
-                >
-                  {busy ? 'Atualizando…' : 'Atualizar notícias'}
-                </button>
-              </div>
-            )}
+            </header>
+            <p className="meta">
+              {activeSource.last_fetched_at
+                ? `Última atualização: ${fmtDate(activeSource.last_fetched_at)}`
+                : 'Este feed ainda não foi atualizado.'}
+            </p>
             {sourceArticles.length ? (
-              <ul className="news-article-list">
+              <ol className="news-modal-list">
                 {sourceArticles.map((article) => (
                   <li key={article.id}>
                     <a href={article.url} target="_blank" rel="noreferrer">{article.title}</a>
@@ -338,11 +404,11 @@ export default function NewsHub({ overviewOnly = false, refreshKey = 0 }) {
                     {article.summary && <p>{article.summary}</p>}
                   </li>
                 ))}
-              </ul>
+              </ol>
             ) : (
-              <p className="meta">Ainda não há notícias para esta agência. Use “Atualizar notícias”.</p>
+              <p className="meta">Ainda não há notícias salvas desta agência. Atualize o feed pelo painel Admin.</p>
             )}
-          </div>
+          </section>
         </div>
       )}
 
