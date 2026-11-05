@@ -214,6 +214,13 @@ a.news:hover { text-decoration: underline; }
 .news-modal-list time { display: block; margin-top: 5px; color: var(--muted); font-size: .72rem; }
 .news-modal-list p { margin: 7px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.5; }
 .admin-panel { margin-top: 18px; padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 12px 35px rgba(20, 28, 48, .07); }
+.admin-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.admin-header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+.admin-refresh-all { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; color: #fff; background: var(--accent); border: 1px solid var(--accent); border-radius: 9px; cursor: pointer; font: inherit; font-size: .82rem; font-weight: 750; transition: filter .15s, transform .15s; }
+.admin-refresh-all:hover:not(:disabled) { filter: brightness(.94); transform: translateY(-1px); }
+.admin-refresh-all:disabled, .admin-add-source:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+.admin-refresh-all .admin-spinner { border-color: rgba(255,255,255,.45); border-top-color: #fff; }
+.admin-batch-progress { margin: 14px 0 0; padding: 10px 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); border-radius: 9px; font-size: .8rem; font-weight: 650; }
 .admin-login, .admin-form { display: grid; gap: 12px; margin-top: 16px; }
 .admin-login { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
 .admin-panel h3, .admin-panel h4 { margin: 0; }
@@ -257,6 +264,9 @@ a.news:hover { text-decoration: underline; }
   .admin-login { grid-template-columns: minmax(0, 1fr); }
   .admin-login .collect { width: 100%; }
   .admin-panel { padding: 14px; }
+  .admin-panel-heading { align-items: stretch; flex-direction: column; }
+  .admin-header-actions { width: 100%; }
+  .admin-header-actions > button { flex: 1; }
   .admin-source-row { flex-wrap: wrap; gap: 9px; padding: 10px; }
   .admin-source-info { flex-basis: calc(100% - 58px); }
   .admin-source-actions { width: 100%; justify-content: flex-end; }

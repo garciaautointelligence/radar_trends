@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabase'
 
 const NEWS_CATEGORIES = ['Brasil', 'Internacional', 'Política', 'Economia', 'Breaking News']
@@ -139,6 +139,8 @@ export default function NewsHub({ refreshKey = 0 }) {
   const [authenticated, setAuthenticated] = useState(false)
   const [adminSources, setAdminSources] = useState([])
   const [refreshingSourceId, setRefreshingSourceId] = useState(null)
+  const [refreshAllProgress, setRefreshAllProgress] = useState(null)
+  const refreshAllLock = useRef(false)
   const [refreshErrors, setRefreshErrors] = useState({})
   const [password, setPassword] = useState('')
   const [form, setForm] = useState({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })
@@ -244,6 +246,7 @@ export default function NewsHub({ refreshKey = 0 }) {
   }
 
   const refreshSource = async (sourceId) => {
+    if (refreshAllProgress || refreshingSourceId) return
     setRefreshingSourceId(sourceId)
     setRefreshErrors((current) => ({ ...current, [sourceId]: null }))
     setNotice(null)
@@ -273,7 +276,73 @@ export default function NewsHub({ refreshKey = 0 }) {
     }
   }
 
+  const refreshAllSources = async () => {
+    const activeSources = adminSources.filter((source) => source.active)
+    if (refreshAllLock.current || refreshingSourceId || !activeSources.length) return
+
+    refreshAllLock.current = true
+    setRefreshAllProgress({ current: 0, total: activeSources.length, sourceName: '' })
+    setRefreshErrors((current) => {
+      const next = { ...current }
+      activeSources.forEach((source) => { delete next[source.id] })
+      return next
+    })
+    setNotice(null)
+    const failures = []
+    let completed = 0
+    let authenticationExpired = false
+
+    for (const source of activeSources) {
+      setRefreshingSourceId(source.id)
+      setRefreshAllProgress({
+        current: completed + 1,
+        total: activeSources.length,
+        sourceName: source.name,
+      })
+      try {
+        await postAdmin('refresh', { source_id: source.id })
+        completed += 1
+      } catch (refreshError) {
+        failures.push({ source, message: refreshError.message })
+        setRefreshErrors((current) => ({ ...current, [source.id]: refreshError.message }))
+        completed += 1
+        if (refreshError.status === 401) {
+          authenticationExpired = true
+          setAuthenticated(false)
+          setAdminOpen(true)
+          break
+        }
+      }
+    }
+
+    setRefreshingSourceId(null)
+    try {
+      await Promise.all([loadNews(), loadAdminSources()])
+      if (failures.length) {
+        const failedNames = failures.map(({ source }) => source.name).join(', ')
+        setNotice({
+          type: 'warn',
+          text: `Atualizados: ${completed - failures.length}. Falharam: ${failedNames}.${authenticationExpired ? ' A sessão expirou; entre novamente.' : ''}`,
+        })
+      } else {
+        setNotice({
+          type: 'ok',
+          text: `${completed} feeds atualizados com sucesso.`,
+        })
+      }
+    } catch (loadError) {
+      setNotice({
+        type: 'error',
+        text: `Atualização encerrada, mas não foi possível recarregar o painel: ${loadError.message}`,
+      })
+    } finally {
+      refreshAllLock.current = false
+      setRefreshAllProgress(null)
+    }
+  }
+
   const deleteSource = async (sourceId) => {
+    if (refreshAllProgress || refreshingSourceId) return
     if (!window.confirm('Excluir esta fonte e as notícias salvas dela?')) return
     setBusy(true)
     setNotice(null)
@@ -340,9 +409,9 @@ export default function NewsHub({ refreshKey = 0 }) {
     <section className="news-hub">
       <div className="news-heading">
         <div>
-          <p className="news-kicker">PANORAMA DE NOTÍCIAS</p>
-          <h2 className="section-title">Últimas manchetes</h2>
-          <p className="meta">Uma visão rápida de todas as fontes. Selecione um logo para ver as 10 últimas notícias.</p>
+          <p className="news-kicker">Últimas Notícias</p>
+          <h2 className="section-title">PANORAMA NEWS</h2>
+          <p className="meta">Uma visão rápida de todas as fontes. Selecione uma agência  para ver as 10 últimas notícias.</p>
         </div>
         <button className="dashboard-button" type="button" onClick={openAdmin}>
           Admin · fontes RSS
@@ -430,15 +499,40 @@ export default function NewsHub({ refreshKey = 0 }) {
 
       {adminOpen && (
         <div className="admin-panel">
-          <div className="news-feed-heading">
+          <div className="admin-panel-heading">
             <div>
               <h3>Administração de feeds</h3>
-              <p className="meta">A senha é validada no servidor; não fica salva no navegador.</p>
+              <p className="meta">
+                {authenticated
+                  ? 'Gerencie as fontes e mantenha as manchetes atualizadas.'
+                  : 'A senha é validada no servidor; não fica salva no navegador.'}
+              </p>
             </div>
-            <button type="button" className="dashboard-button" onClick={() => setAdminOpen(false)}>
-              Fechar
-            </button>
+            <div className="admin-header-actions">
+              {authenticated && (
+                <button
+                  type="button"
+                  className="admin-refresh-all"
+                  disabled={busy || refreshingSourceId !== null || !adminSources.some((source) => source.active)}
+                  onClick={refreshAllSources}
+                >
+                  {refreshAllProgress ? (
+                    <><span className="admin-spinner" aria-hidden="true" /> {refreshAllProgress.current}/{refreshAllProgress.total}</>
+                  ) : (
+                    '⟳ Atualizar todos'
+                  )}
+                </button>
+              )}
+              <button type="button" className="dashboard-button" onClick={() => setAdminOpen(false)}>
+                Fechar
+              </button>
+            </div>
           </div>
+          {refreshAllProgress && (
+            <p className="admin-batch-progress" role="status">
+              Atualizando {refreshAllProgress.sourceName} ({refreshAllProgress.current} de {refreshAllProgress.total})
+            </p>
+          )}
           {!authenticated ? (
             <form className="admin-login" onSubmit={login}>
               <label className="search-field">
@@ -479,7 +573,7 @@ export default function NewsHub({ refreshKey = 0 }) {
                       <button
                         type="button"
                         className="admin-refresh-button"
-                        disabled={busy || refreshingSourceId !== null || !source.active}
+                        disabled={busy || refreshAllProgress !== null || refreshingSourceId !== null || !source.active}
                         onClick={() => refreshSource(source.id)}
                       >
                         {refreshingSourceId === source.id ? (
@@ -493,7 +587,7 @@ export default function NewsHub({ refreshKey = 0 }) {
                         className="admin-icon-button"
                         aria-label={`Editar ${source.name}`}
                         title="Editar fonte"
-                        disabled={busy || refreshingSourceId !== null}
+                        disabled={busy || refreshAllProgress !== null || refreshingSourceId !== null}
                         onClick={() => {
                           setForm({
                             id: source.id,
@@ -512,7 +606,7 @@ export default function NewsHub({ refreshKey = 0 }) {
                         className="admin-icon-button danger"
                         aria-label={`Excluir ${source.name}`}
                         title="Excluir fonte"
-                        disabled={busy || refreshingSourceId !== null}
+                        disabled={busy || refreshAllProgress !== null || refreshingSourceId !== null}
                         onClick={() => deleteSource(source.id)}
                       >
                         ×
@@ -524,6 +618,7 @@ export default function NewsHub({ refreshKey = 0 }) {
               <button
                 type="button"
                 className="admin-add-source"
+                disabled={busy || refreshAllProgress !== null || refreshingSourceId !== null}
                 onClick={() => {
                   setForm({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })
                   setSourceFormOpen(true)
@@ -532,7 +627,7 @@ export default function NewsHub({ refreshKey = 0 }) {
                 <span aria-hidden="true">＋</span> Cadastrar agência + RSS
               </button>
               <div className="admin-session-actions">
-                <button type="button" className="dashboard-button" disabled={busy} onClick={logout}>
+                <button type="button" className="dashboard-button" disabled={busy || refreshAllProgress !== null || refreshingSourceId !== null} onClick={logout}>
                   Sair do admin
                 </button>
               </div>
