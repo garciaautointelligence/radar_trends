@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isPublicAddress, parseArticles, parseFeedUrl } from './news-admin.mjs'
+import { decodeFeed, isPublicAddress, parseArticles, parseFeedUrl } from './news-admin.mjs'
 
 test('parseia notícias de RSS e remove duplicadas', () => {
   const items = parseArticles(`<?xml version="1.0"?>
@@ -39,6 +39,18 @@ test('usa guid quando o RSS não informa link e entende dia da semana em portugu
 
   assert.equal(items[0].url, 'https://senado.example/noticia/123')
   assert.equal(items[0].published_at, '2026-11-05T11:09:21.000Z')
+})
+
+test('decodifica feeds usando o charset informado pelo servidor', () => {
+  const latin1Bytes = Buffer.from(
+    '<title>Incêndio em prédio residencial</title>',
+    'latin1'
+  )
+
+  assert.equal(
+    decodeFeed(latin1Bytes, 'application/rss+xml; charset=ISO-8859-1'),
+    '<title>Incêndio em prédio residencial</title>'
+  )
 })
 
 test('aceita somente feeds HTTPS em host e porta padrão', () => {

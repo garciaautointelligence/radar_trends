@@ -169,13 +169,22 @@ function requestFeed(url, address) {
         response.on('end', () => resolve({
           status: response.statusCode || 0,
           location: response.headers.location,
-          body: Buffer.concat(chunks).toString('utf8'),
+          body: decodeFeed(Buffer.concat(chunks), response.headers['content-type']),
         }))
       }
     )
     request.on('timeout', () => request.destroy(new Error('Tempo limite ao consultar o feed.')))
     request.on('error', reject)
   })
+}
+
+function decodeFeed(bytes, contentType = '') {
+  const charset = contentType.match(/charset\s*=\s*["']?([^;"'\s]+)/i)?.[1] || 'utf-8'
+  try {
+    return new TextDecoder(charset).decode(bytes)
+  } catch (error) {
+    throw new Error(`Charset não suportado no feed: ${charset}.`, { cause: error })
+  }
 }
 
 async function fetchFeed(initialUrl) {
@@ -423,4 +432,4 @@ export default async function handler(req, res) {
   }
 }
 
-export { isPublicAddress, parseArticles, parseFeedUrl }
+export { decodeFeed, isPublicAddress, parseArticles, parseFeedUrl }
