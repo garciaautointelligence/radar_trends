@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { decodeFeed, isPublicAddress, parseArticles, parseFeedUrl } from './news-admin.mjs'
+import { decodeFeed, isPublicAddress, parseArticles, parseFeedUrl, parseLogoUrl } from './news-admin.mjs'
 
 test('parseia notícias de RSS e remove duplicadas', () => {
   const items = parseArticles(`<?xml version="1.0"?>
@@ -41,6 +41,26 @@ test('usa guid quando o RSS não informa link e entende dia da semana em portugu
   assert.equal(items[0].published_at, '2026-11-05T11:09:21.000Z')
 })
 
+test('importa notícias de RSS WordPress com campos namespaceados como o da CNN Brasil', () => {
+  const items = parseArticles(`<rss version="2.0"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel><item>
+      <title>Notícia da CNN &amp; atualização</title>
+      <link>https://www.cnnbrasil.com.br/noticia/123/</link>
+      <dc:creator><![CDATA[Redação CNN]]></dc:creator>
+      <pubDate>Fri, 06 Nov 2026 10:21:16 +0000</pubDate>
+      <guid isPermaLink="false">https://www.cnnbrasil.com.br///</guid>
+      <description><![CDATA[Resumo da notícia]]></description>
+      <content:encoded><![CDATA[<p>Texto completo</p>]]></content:encoded>
+    </item></channel></rss>`)
+
+  assert.equal(items.length, 1)
+  assert.equal(items[0].title, 'Notícia da CNN & atualização')
+  assert.equal(items[0].url, 'https://www.cnnbrasil.com.br/noticia/123/')
+  assert.equal(items[0].summary, 'Resumo da notícia')
+})
+
 test('decodifica feeds usando o charset informado pelo servidor', () => {
   const latin1Bytes = Buffer.from(
     '<title>Incêndio em prédio residencial</title>',
@@ -59,6 +79,13 @@ test('aceita somente feeds HTTPS em host e porta padrão', () => {
   assert.throws(() => parseFeedUrl('https://127.0.0.1/rss'))
   assert.throws(() => parseFeedUrl('https://[::1]/rss'))
   assert.throws(() => parseFeedUrl('https://news.example:8443/rss'))
+})
+
+test('aceita URL HTTPS opcional para a logo e rejeita protocolos inválidos', () => {
+  assert.equal(parseLogoUrl(''), null)
+  assert.equal(parseLogoUrl('  https://cdn.example/logo.png  '), 'https://cdn.example/logo.png')
+  assert.throws(() => parseLogoUrl('http://cdn.example/logo.png'))
+  assert.throws(() => parseLogoUrl('javascript:alert(1)'))
 })
 
 test('bloqueia endereços de rede privada e aceita IPs públicos', () => {

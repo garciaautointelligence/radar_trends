@@ -104,6 +104,20 @@ function parseFeedUrl(value) {
   return url
 }
 
+function parseLogoUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return null
+  let url
+  try {
+    url = new URL(value.trim())
+  } catch {
+    throw new Error('Informe uma URL válida para a logo.')
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || !url.hostname || url.href.length > 2048) {
+    throw new Error('A logo precisa usar uma URL HTTPS válida.')
+  }
+  return url.href
+}
+
 function isPublicAddress(address) {
   const family = isIP(address)
   if (family === 4) {
@@ -336,7 +350,7 @@ export default async function handler(req, res) {
     try {
       const { data, error } = await getSupabase()
         .from('news_sources')
-        .select('id, name, feed_url, categories, active, last_fetched_at, last_attempted_at')
+        .select('id, name, feed_url, logo_url, categories, active, last_fetched_at, last_attempted_at')
         .order('name')
       if (error) throw error
       return res.status(200).json({ ok: true, sources: data })
@@ -382,6 +396,7 @@ export default async function handler(req, res) {
       const source = body.source || {}
       const name = cleanString(source.name, 60)
       const feedUrl = parseFeedUrl(source.feed_url)
+      const logoUrl = parseLogoUrl(source.logo_url)
       const categories = [...new Set(
         Array.isArray(source.categories)
           ? source.categories.filter((category) => NEWS_CATEGORIES.includes(category))
@@ -392,23 +407,26 @@ export default async function handler(req, res) {
         throw new Error('Selecione pelo menos uma categoria válida.')
       }
       if (source.id) {
-        const { error } = await supabase.from('news_sources').update({
+        const { data, error } = await supabase.from('news_sources').update({
           name,
           feed_url: feedUrl.href,
+          logo_url: logoUrl,
           categories,
           active: source.active !== false,
-        }).eq('id', source.id)
+        }).eq('id', source.id).select('id').single()
         if (error) throw error
+        return res.status(200).json({ ok: true, source_id: data.id })
       } else {
-        const { error } = await supabase.from('news_sources').insert({
+        const { data, error } = await supabase.from('news_sources').insert({
           name,
           feed_url: feedUrl.href,
+          logo_url: logoUrl,
           categories,
           active: source.active !== false,
-        })
+        }).select('id').single()
         if (error) throw error
+        return res.status(200).json({ ok: true, source_id: data.id })
       }
-      return res.status(200).json({ ok: true })
     }
     if (action === 'delete') {
       if (typeof body.source_id !== 'string') throw new Error('Identificador de fonte inválido.')
@@ -432,4 +450,4 @@ export default async function handler(req, res) {
   }
 }
 
-export { decodeFeed, isPublicAddress, parseArticles, parseFeedUrl }
+export { decodeFeed, isPublicAddress, parseArticles, parseFeedUrl, parseLogoUrl }

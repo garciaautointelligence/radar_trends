@@ -41,6 +41,7 @@ async function postAdmin(action, values = {}) {
 
 function AgencyLogo({ source, onClick }) {
   const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [source.logo_url])
   let domain = AGENCY_DOMAINS[source.name]
   if (!domain) {
     try {
@@ -55,7 +56,7 @@ function AgencyLogo({ source, onClick }) {
       ? <button className="agency-logo-button" type="button" aria-label={`Abrir as últimas 10 notícias de ${source.name}`} onClick={onClick}>{fallback}</button>
       : <span className="agency-logo-button" aria-hidden="true">{fallback}</span>
   }
-  const logoUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`
+  const logoUrl = source.logo_url || `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`
 
   const image = !failed ? (
     <img src={logoUrl} alt="" onError={() => setFailed(true)} />
@@ -143,7 +144,7 @@ export default function NewsHub({ refreshKey = 0 }) {
   const refreshAllLock = useRef(false)
   const [refreshErrors, setRefreshErrors] = useState({})
   const [password, setPassword] = useState('')
-  const [form, setForm] = useState({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })
+  const [form, setForm] = useState({ id: '', name: '', feed_url: '', logo_url: '', categories: ['Brasil'], active: true })
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
 
@@ -153,7 +154,7 @@ export default function NewsHub({ refreshKey = 0 }) {
     try {
       const sourceResult = await supabase
         .from('news_sources')
-        .select('id, name, feed_url, categories, last_fetched_at')
+        .select('id, name, feed_url, logo_url, categories, last_fetched_at')
         .eq('active', true)
         .order('name')
       if (sourceResult.error) {
@@ -233,11 +234,24 @@ export default function NewsHub({ refreshKey = 0 }) {
     setBusy(true)
     setNotice(null)
     try {
-      await postAdmin('save', { source: form })
-      setForm({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })
+      const isNewSource = !form.id
+      const saved = await postAdmin('save', { source: form })
+      setForm({ id: '', name: '', feed_url: '', logo_url: '', categories: ['Brasil'], active: true })
       setSourceFormOpen(false)
+      let refreshNotice = null
+      if (isNewSource && form.active) {
+        try {
+          const result = await postAdmin('refresh', { source_id: saved.source_id })
+          refreshNotice = { type: 'ok', text: `Fonte salva; ${result.items} notícias importadas.` }
+        } catch (refreshError) {
+          refreshNotice = {
+            type: 'warn',
+            text: `Fonte salva, mas não foi possível importar notícias: ${refreshError.message}`,
+          }
+        }
+      }
       await Promise.all([loadAdminSources(), loadNews()])
-      setNotice({ type: 'ok', text: 'Fonte salva.' })
+      setNotice(refreshNotice || { type: 'ok', text: 'Fonte salva.' })
     } catch (saveError) {
       setNotice({ type: 'error', text: saveError.message })
     } finally {
@@ -348,7 +362,7 @@ export default function NewsHub({ refreshKey = 0 }) {
     setNotice(null)
     try {
       await postAdmin('delete', { source_id: sourceId })
-      setForm({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })
+      setForm({ id: '', name: '', feed_url: '', logo_url: '', categories: ['Brasil'], active: true })
       setSourceFormOpen(false)
       await Promise.all([loadAdminSources(), loadNews()])
       setNotice({ type: 'ok', text: 'Fonte excluída.' })
@@ -593,6 +607,7 @@ export default function NewsHub({ refreshKey = 0 }) {
                             id: source.id,
                             name: source.name,
                             feed_url: source.feed_url,
+                            logo_url: source.logo_url ?? '',
                             categories: source.categories ?? [],
                             active: source.active,
                           })
@@ -620,7 +635,7 @@ export default function NewsHub({ refreshKey = 0 }) {
                 className="admin-add-source"
                 disabled={busy || refreshAllProgress !== null || refreshingSourceId !== null}
                 onClick={() => {
-                  setForm({ id: '', name: '', feed_url: '', categories: ['Brasil'], active: true })
+                  setForm({ id: '', name: '', feed_url: '', logo_url: '', categories: ['Brasil'], active: true })
                   setSourceFormOpen(true)
                 }}
               >
@@ -671,6 +686,16 @@ export default function NewsHub({ refreshKey = 0 }) {
                     onChange={(event) => setForm({ ...form, feed_url: event.target.value })}
                     placeholder="https://exemplo.com/rss"
                     required
+                  />
+                </label>
+                <label className="search-field">
+                  <span>URL da logo (opcional, HTTPS)</span>
+                  <input
+                    type="url"
+                    maxLength={2048}
+                    value={form.logo_url}
+                    onChange={(event) => setForm({ ...form, logo_url: event.target.value })}
+                    placeholder="https://exemplo.com/logo.png"
                   />
                 </label>
                 <fieldset className="admin-categories">

@@ -39,7 +39,8 @@ radar-trends/
 │   ├── 04_term_summary.sql   term_summary (ranking por período)
 │   ├── 05_term_rankings.sql  term_rankings (aba Rankings)
 │   ├── 06_news.sql           fontes RSS e notícias
-│   └── 07_news_categories_and_sources.sql  categorias e fontes iniciais
+│   ├── 07_news_categories_and_sources.sql  categorias e fontes iniciais
+│   └── 08_news_source_logos.sql  campo de logo das fontes
 ├── web/
 │   ├── api/                  funções serverless de coleta e administração de RSS
 │   ├── src/                  interface React
@@ -57,7 +58,7 @@ radar-trends/
 
 1. Crie o projeto no Supabase.
 2. Em **Project Settings → API**, anote a URL, a chave **pública** (anon/publishable) e a chave **secreta** (service_role/secret).
-3. No **SQL Editor**, rode nesta ordem: `01_schema.sql`, `02_views.sql`, `03_movers.sql`, `04_term_summary.sql`, `05_term_rankings.sql`, `06_news.sql` e `07_news_categories_and_sources.sql`.
+3. No **SQL Editor**, rode nesta ordem: `01_schema.sql`, `02_views.sql`, `03_movers.sql`, `04_term_summary.sql`, `05_term_rankings.sql`, `06_news.sql`, `07_news_categories_and_sources.sql` e `08_news_source_logos.sql`.
 
 ## 2. Coletor (PC)
 
@@ -147,7 +148,7 @@ Deploy novo não aparece? Veja em **Deployments** se o último está com erro. Q
 - **Coletar agora:** dispara uma coleta pela função da Vercel. Há intervalo mínimo de 10 minutos entre quaisquer duas coletas (agendadas ou manuais). Coletas manuais ficam com `source = 'google_trends_rss_manual'`.
 - **Notícias:** a página inicial mostra cards compactos com a manchete mais recente, categorias e ícone de cada agência. As categorias filtram as fontes; tocar no ícone abre até as 10 notícias mais recentes daquela agência. O botão de atualização exige sessão de administrador e aplica intervalo mínimo de 5 minutos por fonte. O Google Trends permanece disponível em abas próprias.
 - **Categorias:** as notícias são agrupadas em Brasil, Internacional, Política, Economia e Breaking News. A migração `07_news_categories_and_sources.sql` cadastra as dez fontes iniciais e suas categorias; fontes e categorias podem ser editadas pelo painel Admin.
-- **Admin de RSS:** lista fontes com ícone, status e horário da última atualização; é possível atualizar todos os feeds ativos em sequência ou cada fonte individualmente. Cadastro e edição abrem em uma janela própria. Defina `RADAR_ADMIN_PASSWORD` (mínimo 16 caracteres, de preferência uma senha longa e exclusiva) nas variáveis do servidor Vercel. A senha nunca é salva no navegador; o acesso usa cookie `HttpOnly`, `SameSite=Strict`, com validade de 8 horas. Os feeds precisam usar HTTPS e apontar para endereços públicos.
+- **Admin de RSS:** lista fontes com logo, status e horário da última atualização; é possível atualizar todos os feeds ativos em sequência ou cada fonte individualmente. No cadastro, informe opcionalmente uma URL HTTPS para a logo; sem ela, o sistema usa o favicon do domínio. Ao cadastrar uma fonte ativa, o primeiro carregamento das notícias é iniciado automaticamente. Cadastro e edição abrem em uma janela própria. Defina `RADAR_ADMIN_PASSWORD` (mínimo 16 caracteres, de preferência uma senha longa e exclusiva) nas variáveis do servidor Vercel. A senha nunca é salva no navegador; o acesso usa cookie `HttpOnly`, `SameSite=Strict`, com validade de 8 horas. Os feeds precisam usar HTTPS e apontar para endereços públicos.
 - **Reuters, CNN e AP:** as URLs sugeridas são buscas do Google Notícias limitadas às últimas 24 horas, não feeds oficiais dessas agências. O próprio feed do Google Notícias informa restrições de uso; confira os termos aplicáveis antes de usar fora de um leitor pessoal não comercial.
 - **Atualização local:** as rotas `/api/*` são funções da Vercel; para exercitar cadastro e atualização dos feeds, publique o site ou use um ambiente local que execute as funções serverless. O dashboard local pode ler fontes já cadastradas no Supabase.
 - **Aviso de dados antigos:** aparece após 2 horas sem coleta.
