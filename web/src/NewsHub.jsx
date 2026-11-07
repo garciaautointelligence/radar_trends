@@ -15,6 +15,40 @@ const AGENCY_DOMAINS = {
   'Agência Câmara': 'camara.leg.br',
 }
 
+const normalizeCategories = (categories) => Array.isArray(categories)
+  ? [...new Set(categories.filter((category) => NEWS_CATEGORIES.includes(category)))]
+  : ['Brasil']
+
+const emptySourceForm = () => ({
+  id: '',
+  name: '',
+  feed_url: '',
+  logo_url: '',
+  categories: ['Brasil'],
+  active: true,
+})
+
+const sourceFormFromRecord = (source = {}) => ({
+  id: source.id ?? '',
+  name: source.name ?? '',
+  feed_url: typeof source.feed_url === 'string' ? source.feed_url : '',
+  logo_url: typeof source.logo_url === 'string' ? source.logo_url : '',
+  categories: normalizeCategories(source.categories),
+  active: source.active !== false,
+})
+
+const getLogoUrl = (source) => {
+  if (typeof source?.logo_url !== 'string') return ''
+  const trimmed = source.logo_url.trim()
+  if (!trimmed) return ''
+  try {
+    const parsed = new URL(trimmed)
+    return parsed.protocol === 'https:' ? parsed.href : ''
+  } catch {
+    return ''
+  }
+}
+
 const fmtDate = (iso) =>
   iso
     ? new Date(iso).toLocaleString('pt-BR', {
@@ -41,7 +75,8 @@ async function postAdmin(action, values = {}) {
 
 function AgencyLogo({ source, onClick }) {
   const [failed, setFailed] = useState(false)
-  useEffect(() => setFailed(false), [source.logo_url])
+  const logoUrl = getLogoUrl(source)
+  useEffect(() => setFailed(false), [logoUrl])
   let domain = AGENCY_DOMAINS[source.name]
   if (!domain) {
     try {
@@ -50,16 +85,16 @@ function AgencyLogo({ source, onClick }) {
       domain = ''
     }
   }
-  if (!domain) {
+  const fallbackDomainUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128` : ''
+  if (!domain && !logoUrl) {
     const fallback = <span aria-hidden="true">{source.name.slice(0, 2).toUpperCase()}</span>
     return onClick
       ? <button className="agency-logo-button" type="button" aria-label={`Abrir as últimas 10 notícias de ${source.name}`} onClick={onClick}>{fallback}</button>
       : <span className="agency-logo-button" aria-hidden="true">{fallback}</span>
   }
-  const logoUrl = source.logo_url || `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`
 
   const image = !failed ? (
-    <img src={logoUrl} alt="" onError={() => setFailed(true)} />
+    <img src={logoUrl || fallbackDomainUrl} alt="" onError={() => setFailed(true)} />
   ) : (
     <span aria-hidden="true">{source.name.slice(0, 2).toUpperCase()}</span>
   )
@@ -144,7 +179,7 @@ export default function NewsHub({ refreshKey = 0 }) {
   const refreshAllLock = useRef(false)
   const [refreshErrors, setRefreshErrors] = useState({})
   const [password, setPassword] = useState('')
-  const [form, setForm] = useState({ id: '', name: '', feed_url: '', logo_url: '', categories: ['Brasil'], active: true })
+  const [form, setForm] = useState(emptySourceForm())
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
 
@@ -236,7 +271,7 @@ export default function NewsHub({ refreshKey = 0 }) {
     try {
       const isNewSource = !form.id
       const saved = await postAdmin('save', { source: form })
-      setForm({ id: '', name: '', feed_url: '', logo_url: '', categories: ['Brasil'], active: true })
+      setForm(emptySourceForm())
       setSourceFormOpen(false)
       let refreshNotice = null
       if (isNewSource && form.active) {
@@ -362,7 +397,7 @@ export default function NewsHub({ refreshKey = 0 }) {
     setNotice(null)
     try {
       await postAdmin('delete', { source_id: sourceId })
-      setForm({ id: '', name: '', feed_url: '', logo_url: '', categories: ['Brasil'], active: true })
+      setForm(emptySourceForm())
       setSourceFormOpen(false)
       await Promise.all([loadAdminSources(), loadNews()])
       setNotice({ type: 'ok', text: 'Fonte excluída.' })
@@ -603,14 +638,7 @@ export default function NewsHub({ refreshKey = 0 }) {
                         title="Editar fonte"
                         disabled={busy || refreshAllProgress !== null || refreshingSourceId !== null}
                         onClick={() => {
-                          setForm({
-                            id: source.id,
-                            name: source.name,
-                            feed_url: source.feed_url,
-                            logo_url: source.logo_url ?? '',
-                            categories: source.categories ?? [],
-                            active: source.active,
-                          })
+                          setForm(sourceFormFromRecord(source))
                           setSourceFormOpen(true)
                         }}
                       >
@@ -635,7 +663,7 @@ export default function NewsHub({ refreshKey = 0 }) {
                 className="admin-add-source"
                 disabled={busy || refreshAllProgress !== null || refreshingSourceId !== null}
                 onClick={() => {
-                  setForm({ id: '', name: '', feed_url: '', logo_url: '', categories: ['Brasil'], active: true })
+                  setForm(emptySourceForm())
                   setSourceFormOpen(true)
                 }}
               >
@@ -707,8 +735,8 @@ export default function NewsHub({ refreshKey = 0 }) {
                         checked={form.categories.includes(category)}
                         onChange={(event) => {
                           const categories = event.target.checked
-                            ? [...form.categories, category]
-                            : form.categories.filter((value) => value !== category)
+                            ? normalizeCategories([...form.categories, category])
+                            : normalizeCategories(form.categories.filter((value) => value !== category))
                           setForm({ ...form, categories })
                         }}
                       />
